@@ -8,14 +8,17 @@
 #include "dat.h"
 #include "fns.h"
 
+/* palette colors */
 enum {
-	CBlack,
-	CWhite,
+	PCBlack,
+	PCWhite,
 	NCOLOR
 };
 
 RFrame worldrf;
 Image *pal[NCOLOR];
+Image *background;
+Canvas *curcanvas;
 
 Point
 toscreen(Point2 p)
@@ -33,15 +36,46 @@ fromscreen(Point p)
 void
 initpalette(void)
 {
-	pal[CBlack] = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, DBlack);
-	pal[CWhite] = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, DWhite);
+	pal[PCBlack] = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, DBlack);
+	pal[PCWhite] = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, DWhite);
+}
+
+Image*
+gencheckerboard(int w, int h)
+{
+	Image *i, *dark, *light;
+	int x, y;
+
+	i = eallocimage(display, Rect(0,0,2*w,2*h), screen->chan, 1, DNofill);
+	dark = eallocimage(display, Rect(0,0,w,h), screen->chan, 0, DBlack&~0x7f);
+	light = eallocimage(display, Rect(0,0,w,h), screen->chan, 0, DBlack&~0xdf);
+
+	for(y = 0; y < h; y += h)
+		for(x = 0; x < w; x += w)
+			draw(i, Rect(x,y,x+w,y+h), (x+y) % 2? light: dark, ZP);
+
+	freeimage(dark);
+	freeimage(light);
+	return i;
+}
+
+void
+drawlayer(Canvas *c, Layer *l)
+{
+	draw(c->image, c->image->r, l->image, nil, ZP);
+}
+
+void
+drawcanvas(Canvas *c)
+{
+
 }
 
 void
 redraw(void)
 {
 	lockdisplay(display);
-	draw(screen, screen->r, pal[CBlack], nil, ZP);
+	draw(screen, screen->r, pal[PCBlack], nil, ZP);
 	flushimage(display, 1);
 	unlockdisplay(display);
 }
