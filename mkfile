@@ -3,6 +3,7 @@
 BIN=/$objtype/bin
 TARG=puppeteer
 OFILES=\
+	utils.$O\
 	alloc.$O\
 	layer.$O\
 	canvas.$O\

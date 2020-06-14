@@ -20,6 +20,8 @@ Image *pal[NCOLOR];
 Image *background;
 Canvas *curcanvas;
 
+void resized(void);
+
 Point
 toscreen(Point2 p)
 {
@@ -70,6 +72,8 @@ drawcanvas(Canvas *c)
 {
 	Layer *l;
 
+	if(c == nil)
+		return;
 	for(l = c->layers.next; l != &c->layers; l = l->next)
 		drawlayer(c, l);
 	draw(screen, rectaddpt(c->image->r, toscreen(c->p)), c->image, nil, ZP);
@@ -81,21 +85,9 @@ redraw(void)
 	lockdisplay(display);
 	draw(screen, screen->r, pal[PCBlack], nil, ZP);
 	draw(screen, curcanvas == nil? screen->r: rectaddpt(curcanvas->image->r, toscreen(curcanvas->p)), background, nil, ZP);
-	if(curcanvas != nil)
-		drawcanvas(curcanvas);
+	drawcanvas(curcanvas);
 	flushimage(display, 1);
 	unlockdisplay(display);
-}
-
-void
-resized(void)
-{
-	lockdisplay(display);
-	if(getwindow(display, Refnone) < 0)
-		sysfatal("resize failed");
-	unlockdisplay(display);
-	worldrf.p = Pt2(screen->r.min.x,screen->r.max.y,1);
-	redraw();
 }
 
 void
@@ -114,6 +106,7 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	char buf[256], chanstr[9+1], *s;
 	ulong w, h, chan;
 	Point2 cpos;
+	Layer *l;
 
 	switch(menuhit(3, mc, &menu, nil)){
 	case NEW:
@@ -124,20 +117,77 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		w = strtoul(buf, &s, 10);
 		h = strtoul(s, &s, 10);
 		chan = strtochan(s);
-		cpos = Pt2(Dx(screen->r)/2 - w/2,Dy(screen->r)/2 + h/2,1);
-		curcanvas = newcanvas(cpos, Rect(0,0,w,h), chan);
+		cpos = Pt2(Dx(screen->r)/2 - w/2,Dy(screen->r)/2 - h/2,1);
+		curcanvas = newcanvas("default", cpos, Rect(0,0,w,h), chan);
+		fprint(2, "created canvas %s\n", curcanvas->name);
 		break;
 	case NEWLAYER:
 		if(curcanvas == nil)
 			break;
-		newlayer(curcanvas);
+		buf[0] = 0;
+		while(strlen(buf) == 0)
+			enter("layer name", buf, sizeof buf, mc, kc, nil);
+		l = newlayer(buf, curcanvas);
+		fprint(2, "created layer %s\n", l->name);
 		break;
 	}
+}
+
+static char*
+genlayeritem(int idx)
+{
+	Layer *l;
+
+	l = curcanvas->layers.next;
+	while(l != &curcanvas->layers && idx--)
+		l = l->next;
+	if(l == &curcanvas->layers)
+		return nil;
+	return l->name;
+}
+
+void
+mmb(Mousectl *mc, Keyboardctl *)
+{
+	static Menu menu = { .gen = genlayeritem };
+	int layeridx;
+	Layer *l;
+
+	if(curcanvas == nil)
+		return;
+	layeridx = menuhit(2, mc, &menu, nil);
+	if(layeridx >= 0){
+		l = curcanvas->layers.next;
+		while(l != &curcanvas->layers && layeridx--)
+			l = l->next;
+		curcanvas->curlayer = l;
+		fprint(2, "curlayer %s\n", l->name);
+	}
+}
+
+void
+lmb(Mousectl *mc, Keyboardctl *)
+{
+	Rectangle r;
+	Point2 mpos;
+	Point p;
+
+	if(curcanvas == nil)
+		return;
+	r = Rect(0,0,1,1);
+	mpos = fromscreen(mc->xy);
+	mpos = rframexform(mpos, *curcanvas);
+	p = Pt(mpos.x,mpos.y);
+	draw(curcanvas->curlayer->image, rectaddpt(r, p), pal[PCBlack], nil, ZP);
 }
 
 void
 mouse(Mousectl *mc, Keyboardctl *kc)
 {
+	if((mc->buttons&1) != 0)
+		lmb(mc, kc);
+	if((mc->buttons&2) != 0)
+		mmb(mc, kc);
 	if((mc->buttons&4) != 0)
 		rmb(mc, kc);
 }
@@ -179,9 +229,9 @@ threadmain(int argc, char *argv[])
 	if((kc = initkeyboard(nil)) == nil)
 		sysfatal("initkeyboard: %r");
 
-	worldrf.p = Pt2(screen->r.min.x,screen->r.max.y,1);
-	worldrf.bx = Vec2(1, 0);
-	worldrf.by = Vec2(0,-1);
+	worldrf.p = Pt2(screen->r.min.x,screen->r.min.y,1);
+	worldrf.bx = Vec2(1,0);
+	worldrf.by = Vec2(0,1);
 	initpalette();
 	background = mkcheckerboard(4, 4);
 
@@ -212,4 +262,15 @@ threadmain(int argc, char *argv[])
 
 		redraw();
 	}
+}
+
+void
+resized(void)
+{
+	lockdisplay(display);
+	if(getwindow(display, Refnone) < 0)
+		sysfatal("resize failed");
+	unlockdisplay(display);
+	worldrf.p = Pt2(screen->r.min.x,screen->r.min.y,1);
+	redraw();
 }

@@ -5,17 +5,8 @@
 #include "dat.h"
 #include "fns.h"
 
-static int
-alphachan(ulong chan)
-{
-	for(; chan; chan >>= 8)
-		if(TYPE(chan) == CAlpha)
-			return 1;
-	return 0;
-}
-
 Canvas*
-newcanvas(Point2 p, Rectangle r, ulong chan)
+newcanvas(char *name, Point2 p, Rectangle r, ulong chan)
 {
 	Canvas *c;
 
@@ -23,9 +14,23 @@ newcanvas(Point2 p, Rectangle r, ulong chan)
 	c->p = p;
 	c->bx = Vec2(1,0);
 	c->by = Vec2(0,1);
+	c->name = strdup(name);
 	c->image = eallocimage(display, r, chan, 0, alphachan(chan)? DTransparent: DNofill);
 	memset(&c->layers, 0, sizeof(Layer));
 	c->layers.next = &c->layers;
 	c->layers.prev = &c->layers;
+	c->curlayer = nil;
 	return c;
+}
+
+void
+rmcanvas(Canvas *c)
+{
+	Layer *l;
+
+	for(l = c->layers.next; l != &c->layers; l = l->next)
+		rmlayer(l);
+	freeimage(c->image);
+	free(c->name);
+	free(c);
 }

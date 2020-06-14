@@ -4,6 +4,7 @@ typedef struct Canvas Canvas;
 struct Layer
 {
 	RFrame;
+	char *name;
 	Image *image;
 	Layer *prev, *next;
 };
@@ -11,6 +12,8 @@ struct Layer
 struct Canvas
 {
 	RFrame;
+	char *name;
 	Image *image;
 	Layer layers;
+	Layer *curlayer;
 };
