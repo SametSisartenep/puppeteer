@@ -72,7 +72,7 @@ drawcanvas(Canvas *c)
 
 	for(l = c->layers.next; l != &c->layers; l = l->next)
 		drawlayer(c, l);
-	draw(screen, screen->r, c->image, nil, ZP);
+	draw(screen, rectaddpt(c->image->r, toscreen(c->p)), c->image, nil, ZP);
 }
 
 void
