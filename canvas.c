@@ -27,4 +27,5 @@ newcanvas(Point2 p, Rectangle r, ulong chan)
 	memset(&c->layers, 0, sizeof(Layer));
 	c->layers.next = &c->layers;
 	c->layers.prev = &c->layers;
+	return c;
 }

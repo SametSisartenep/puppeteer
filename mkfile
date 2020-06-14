@@ -5,6 +5,7 @@ TARG=puppeteer
 OFILES=\
 	alloc.$O\
 	layer.$O\
+	canvas.$O\
 	main.$O\
 
 HFILES=\

@@ -19,6 +19,7 @@ newlayer(Canvas *c)
 	l->next = &c->layers;
 	c->layers.prev->next = l;
 	c->layers.prev = l;
+	return l;
 }
 
 void
