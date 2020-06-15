@@ -176,8 +176,25 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 }
 
 void
-mmb(Mousectl *, Keyboardctl *)
+mmb(Mousectl *mc, Keyboardctl *)
 {
+	Point2 oldp, p;
+	Mouse m;
+
+	if(curcanvas == nil)
+		return;
+
+	for(;;){
+		m = mc->Mouse;
+		if(readmouse(mc) < 0)
+			break;
+		if((mc->buttons & 7) != 2)
+			break;
+		oldp = fromscreen(m.xy);
+		p = fromscreen(mc->xy);
+		curcanvas->p = addpt2(curcanvas->p, subpt2(p, oldp));
+		redraw();
+	}
 }
 
 void
