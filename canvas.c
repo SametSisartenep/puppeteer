@@ -49,3 +49,14 @@ addlayer(Canvas *c, char *name)
 		c->curlayer = l;
 	return l;
 }
+
+Layer*
+getlayer(Canvas *c, char *name)
+{
+	Layer *l;
+
+	for(l = c->layers.next; l != &c->layers; l = l->next)
+		if(strcmp(l->name, name) == 0)
+			return l;
+	return nil;
+}

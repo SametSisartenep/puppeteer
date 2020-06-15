@@ -98,6 +98,7 @@ genrmbmenuitem(int idx)
 		NEW,
 		NEWLAYER,
 		SETCOLOR,
+		SAVE,
 		SEP,
 		NITEMS
 	};
@@ -107,6 +108,7 @@ genrmbmenuitem(int idx)
 	case NEW: return "new";
 	case NEWLAYER: return "new layer";
 	case SETCOLOR: return "set color";
+	case SAVE: return "save";
 	case SEP: return "";
 	}
 
@@ -129,12 +131,13 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		NEW,
 		NEWLAYER,
 		SETCOLOR,
+		SAVE,
 		SEP,
 		NITEMS
 	};
 	static Menu menu = { .gen = genrmbmenuitem };
 	char buf[256], chanstr[9+1], *s;
-	int w, h, idx;
+	int w, h, idx, fd;
 	ulong chan;
 	Point2 cpos;
 	Layer *l;
@@ -154,16 +157,14 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		chan = strtochan(s);
 		cpos = Pt2(Dx(screen->r)/2 - w/2,Dy(screen->r)/2 - h/2,1);
 		curcanvas = newcanvas("default", cpos, Rect(0,0,w,h), chan);
-		fprint(2, "created canvas %s\n", curcanvas->name);
 		break;
 	case NEWLAYER:
 		if(curcanvas == nil)
 			break;
 		buf[0] = 0;
-		while(strlen(buf) == 0)
+		while(strlen(buf) == 0 || getlayer(curcanvas, buf) != nil)
 			enter("layer name", buf, sizeof buf, mc, kc, nil);
 		addlayer(curcanvas, buf);
-		fprint(2, "created layer %s\n", buf);
 		break;
 	case SETCOLOR:
 		buf[0] = 0;
@@ -171,6 +172,19 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 			enter("hex value", buf, sizeof buf, mc, kc, nil);
 		brushcolor = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, strtoul(buf, nil, 16));
 		break;
+	case SAVE:
+		if(curcanvas == nil)
+			break;
+		buf[0] = 0;
+		while(strlen(buf) == 0)
+			enter("file", buf, sizeof buf, mc, kc, nil);
+		fd = create(buf, OWRITE, 0666);
+		if(fd < 0)
+			break;
+		drawcanvas(curcanvas);
+		writeimage(fd, curcanvas->image, 1);
+		close(fd);
+		break;	
 	case SEP:
 		return;
 	}
@@ -181,7 +195,6 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		while(l != &curcanvas->layers && idx--)
 			l = l->next;
 		curcanvas->curlayer = l;
-		fprint(2, "curlayer %s\n", l->name);
 	}
 }
 
