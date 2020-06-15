@@ -19,6 +19,7 @@ RFrame worldrf;
 Image *pal[NCOLOR];
 Image *background;
 Canvas *curcanvas;
+Image *brushcolor;
 
 void resized(void);
 
@@ -96,6 +97,7 @@ genrmbmenuitem(int idx)
 	enum {
 		NEW,
 		NEWLAYER,
+		SETCOLOR,
 		SEP,
 		NITEMS
 	};
@@ -104,6 +106,7 @@ genrmbmenuitem(int idx)
 	switch(idx){
 	case NEW: return "new";
 	case NEWLAYER: return "new layer";
+	case SETCOLOR: return "set color";
 	case SEP: return "";
 	}
 
@@ -125,6 +128,7 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	enum {
 		NEW,
 		NEWLAYER,
+		SETCOLOR,
 		SEP,
 		NITEMS
 	};
@@ -160,6 +164,12 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 			enter("layer name", buf, sizeof buf, mc, kc, nil);
 		addlayer(curcanvas, buf);
 		fprint(2, "created layer %s\n", buf);
+		break;
+	case SETCOLOR:
+		buf[0] = 0;
+		while(strlen(buf) == 0)
+			enter("hex value", buf, sizeof buf, mc, kc, nil);
+		brushcolor = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, strtoul(buf, nil, 16));
 		break;
 	case SEP:
 		return;
@@ -213,7 +223,7 @@ lmb(Mousectl *mc, Keyboardctl *)
 	mpos = rframexform(mpos, *curcanvas);
 	p = Pt(mpos.x,mpos.y);
 
-	draw(curcanvas->curlayer->image, rectaddpt(r, p), pal[PCBlack], nil, ZP);
+	draw(curcanvas->curlayer->image, rectaddpt(r, p), brushcolor, nil, ZP);
 	redraw();
 	for(;;){
 		oldp = p;
@@ -227,7 +237,8 @@ lmb(Mousectl *mc, Keyboardctl *)
 		p = Pt(mpos.x,mpos.y);
 		if(eqpt(p, oldp))
 			continue;
-		draw(curcanvas->curlayer->image, rectaddpt(r, p), pal[PCBlack], nil, ZP);
+		//draw(curcanvas->curlayer->image, rectaddpt(r, p), brushcolor, nil, ZP);
+		line(curcanvas->curlayer->image, oldp, p, Enddisc, Enddisc, 0, brushcolor, ZP);
 		redraw();
 	}
 }
@@ -285,6 +296,7 @@ threadmain(int argc, char *argv[])
 	worldrf.by = Vec2(0,1);
 	initpalette();
 	background = mkcheckerboard(4, 4);
+	brushcolor = pal[PCBlack];
 
 	display->locking = 1;
 	unlockdisplay(display);
