@@ -90,32 +90,63 @@ redraw(void)
 	unlockdisplay(display);
 }
 
+static char*
+genrmbmenuitem(int idx)
+{
+	enum {
+		NEW,
+		NEWLAYER,
+		SEP,
+		NITEMS
+	};
+	Layer *l;
+
+	switch(idx){
+	case NEW: return "new";
+	case NEWLAYER: return "new layer";
+	case SEP: return "";
+	}
+
+	if(curcanvas == nil)
+		return nil;
+
+	idx -= NITEMS;
+	l = curcanvas->layers.next;
+	while(l != &curcanvas->layers && idx--)
+		l = l->next;
+	if(l == &curcanvas->layers)
+		return nil;
+	return l->name;
+}
+
 void
 rmb(Mousectl *mc, Keyboardctl *kc)
 {
 	enum {
 		NEW,
-		NEWLAYER
+		NEWLAYER,
+		SEP,
+		NITEMS
 	};
-	static char *items[] = {
-	 [NEW]		"new",
-	 [NEWLAYER]	"new layer",
-		nil
-	};
-	static Menu menu = { .item = items };
+	static Menu menu = { .gen = genrmbmenuitem };
 	char buf[256], chanstr[9+1], *s;
-	ulong w, h, chan;
+	int w, h, idx;
+	ulong chan;
 	Point2 cpos;
 	Layer *l;
 
-	switch(menuhit(3, mc, &menu, nil)){
+	idx = menuhit(3, mc, &menu, nil);
+	if(idx < 0)
+		return;
+
+	switch(idx){
 	case NEW:
 		if(curcanvas != nil)
 			break;
 		snprint(buf, sizeof buf, "%d %d %s", Dx(screen->r), Dy(screen->r), chantostr(chanstr, screen->chan));
 		enter("w h chan", buf, sizeof buf, mc, kc, nil);
-		w = strtoul(buf, &s, 10);
-		h = strtoul(s, &s, 10);
+		w = strtol(buf, &s, 10);
+		h = strtol(s, &s, 10);
 		chan = strtochan(s);
 		cpos = Pt2(Dx(screen->r)/2 - w/2,Dy(screen->r)/2 - h/2,1);
 		curcanvas = newcanvas("default", cpos, Rect(0,0,w,h), chan);
@@ -127,38 +158,17 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		buf[0] = 0;
 		while(strlen(buf) == 0)
 			enter("layer name", buf, sizeof buf, mc, kc, nil);
-		l = newlayer(buf, curcanvas);
-		fprint(2, "created layer %s\n", l->name);
+		addlayer(curcanvas, buf);
+		fprint(2, "created layer %s\n", buf);
 		break;
-	}
-}
-
-static char*
-genlayeritem(int idx)
-{
-	Layer *l;
-
-	l = curcanvas->layers.next;
-	while(l != &curcanvas->layers && idx--)
-		l = l->next;
-	if(l == &curcanvas->layers)
-		return nil;
-	return l->name;
-}
-
-void
-mmb(Mousectl *mc, Keyboardctl *)
-{
-	static Menu menu = { .gen = genlayeritem };
-	int layeridx;
-	Layer *l;
-
-	if(curcanvas == nil)
+	case SEP:
 		return;
-	layeridx = menuhit(2, mc, &menu, nil);
-	if(layeridx >= 0){
+	}
+
+	idx -= NITEMS;
+	if(idx >= 0){
 		l = curcanvas->layers.next;
-		while(l != &curcanvas->layers && layeridx--)
+		while(l != &curcanvas->layers && idx--)
 			l = l->next;
 		curcanvas->curlayer = l;
 		fprint(2, "curlayer %s\n", l->name);
@@ -166,19 +176,43 @@ mmb(Mousectl *mc, Keyboardctl *)
 }
 
 void
+mmb(Mousectl *, Keyboardctl *)
+{
+}
+
+void
 lmb(Mousectl *mc, Keyboardctl *)
 {
 	Rectangle r;
 	Point2 mpos;
-	Point p;
+	Point p, oldp;
+	Mouse m;
 
-	if(curcanvas == nil)
+	if(curcanvas == nil || curcanvas->curlayer == nil)
 		return;
+
 	r = Rect(0,0,1,1);
 	mpos = fromscreen(mc->xy);
 	mpos = rframexform(mpos, *curcanvas);
 	p = Pt(mpos.x,mpos.y);
+
 	draw(curcanvas->curlayer->image, rectaddpt(r, p), pal[PCBlack], nil, ZP);
+	redraw();
+	for(;;){
+		oldp = p;
+		m = mc->Mouse;
+		if(readmouse(mc) < 0)
+			break;
+		if(((mc->buttons ^ m.buttons) & 7) != 0)
+			break;
+		mpos = fromscreen(mc->xy);
+		mpos = rframexform(mpos, *curcanvas);
+		p = Pt(mpos.x,mpos.y);
+		if(eqpt(p, oldp))
+			continue;
+		draw(curcanvas->curlayer->image, rectaddpt(r, p), pal[PCBlack], nil, ZP);
+		redraw();
+	}
 }
 
 void

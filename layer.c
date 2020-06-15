@@ -6,22 +6,17 @@
 #include "fns.h"
 
 Layer*
-newlayer(char *name, Canvas *c)
+newlayer(char *name, Rectangle r, ulong chan)
 {
 	Layer *l;
 
 	l = emalloc(sizeof(Layer));
 	l->p = Pt2(0,0,1);
-	l->bx = c->bx;
-	l->by = c->by;
+	l->bx = Vec2(1,0);
+	l->by = Vec2(0,1);
 	l->name = strdup(name);
-	l->image = eallocimage(display, c->image->r, c->image->chan, 0, 0);
-	l->prev = c->layers.prev;
-	l->next = &c->layers;
-	c->layers.prev->next = l;
-	c->layers.prev = l;
-	if(c->curlayer == nil)
-		c->curlayer = l;
+	l->image = eallocimage(display, r, chan, 0, alphachan(chan)? DTransparent: DWhite);
+	l->prev = l->next = nil;
 	return l;
 }
 

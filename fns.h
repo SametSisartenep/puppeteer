@@ -6,9 +6,10 @@ Image *eallocimage(Display*, Rectangle, ulong, int, ulong);
 /* canvas */
 Canvas *newcanvas(char*, Point2, Rectangle, ulong);
 void rmcanvas(Canvas*);
+Layer *addlayer(Canvas*, char*);
 
 /* layer */
-Layer *newlayer(char*, Canvas*);
+Layer *newlayer(char*, Rectangle, ulong);
 void rmlayer(Layer*);
 
 /* utils */
