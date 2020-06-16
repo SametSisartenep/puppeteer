@@ -2,6 +2,12 @@
 #include <libc.h>
 #include <draw.h>
 
+int
+clamp(int n, int min, int max)
+{
+	return n < min? min: n > max? max: n;
+}
+
 double
 fclamp(double n, double min, double max)
 {

@@ -8,18 +8,12 @@
 #include "dat.h"
 #include "fns.h"
 
-/* palette colors */
-enum {
-	PCBlack,
-	PCWhite,
-	NCOLOR
-};
-
 RFrame worldrf;
-Image *pal[NCOLOR];
 Image *background;
 Canvas *curcanvas;
 Image *brushcolor;
+Image *pal[NCOLOR];
+int zoom = 1;
 
 void resized(void);
 
@@ -252,8 +246,7 @@ lmb(Mousectl *mc, Keyboardctl *)
 		p = Pt(mpos.x,mpos.y);
 		if(eqpt(p, oldp))
 			continue;
-		//draw(curcanvas->curlayer->image, rectaddpt(r, p), brushcolor, nil, ZP);
-		line(curcanvas->curlayer->image, oldp, p, Enddisc, Enddisc, 0, brushcolor, ZP);
+		line(curcanvas->curlayer->image, oldp, p, Endsquare, Endsquare, 0, brushcolor, ZP);
 		redraw();
 	}
 }
@@ -267,6 +260,10 @@ mouse(Mousectl *mc, Keyboardctl *kc)
 		mmb(mc, kc);
 	if((mc->buttons&4) != 0)
 		rmb(mc, kc);
+	if((mc->buttons&8) != 0)
+		zoom = clamp(++zoom, 0, MAXZOOM);
+	if((mc->buttons&16) != 0)
+		zoom = clamp(--zoom, 0, MAXZOOM);
 }
 
 void
@@ -276,6 +273,12 @@ key(Rune r)
 	case Kdel:
 	case 'q':
 		threadexitsall(nil);
+	case '+':
+		zoom = clamp(++zoom, 0, MAXZOOM);
+		break;
+	case '-':
+		zoom = clamp(--zoom, 0, MAXZOOM);
+		break;
 	}
 }
 

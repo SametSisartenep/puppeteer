@@ -14,5 +14,6 @@ Layer *newlayer(char*, Rectangle, ulong);
 void rmlayer(Layer*);
 
 /* utils */
+int clamp(int, int, int);
 double fclamp(double, double, double);
 int alphachan(ulong);
