@@ -35,12 +35,15 @@ struct HUD
 {
 	Point2 p;
 	HUDWidget *widgets;
+
+	void (*addwidget)(HUD*, Point2, char*, ...);
 };
 
 struct HUDWidget
 {
 	Point2 p;
 	char *fmt;
-	va_arg va;
+	void *args;
+	int nargs;
 	HUDWidget *next;
 };

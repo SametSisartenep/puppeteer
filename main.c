@@ -8,12 +8,19 @@
 #include "dat.h"
 #include "fns.h"
 
+enum {
+	SMPOS,
+	NSTAT
+};
+
 RFrame worldrf;
 Image *background;
 Canvas *curcanvas;
 Image *brushcolor;
 Image *pal[NCOLOR];
 int zoom = 1;
+
+char stats[NSTAT][256];
 
 void resized(void);
 
@@ -57,6 +64,16 @@ mkcheckerboard(int w, int h)
 }
 
 void
+drawstats(void)
+{
+	int i;
+	Point o;
+
+	for(i = 0, o = Pt(10,10); i < nelem(stats); i++, o.y += font->height)
+		stringn(screen, addpt(screen->r.min, o), pal[PCWhite], ZP, font, stats[i], sizeof stats[i]);
+}
+
+void
 drawlayer(Layer *l, Canvas *c)
 {
 	draw(c->image, c->image->r, l->image, nil, ZP);
@@ -81,6 +98,7 @@ redraw(void)
 	draw(screen, screen->r, pal[PCBlack], nil, ZP);
 	draw(screen, curcanvas == nil? screen->r: rectaddpt(curcanvas->image->r, toscreen(curcanvas->p)), background, nil, ZP);
 	drawcanvas(curcanvas);
+	drawstats();
 	flushimage(display, 1);
 	unlockdisplay(display);
 }
@@ -154,6 +172,7 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		chan = strtochan(s);
 		cpos = Pt2(Dx(screen->r)/2 - w/2,Dy(screen->r)/2 - h/2,1);
 		curcanvas = newcanvas("default", cpos, Rect(0,0,w,h), chan);
+		addlayer(curcanvas, "layer #1");
 		break;
 	case NEWLAYER:
 		if(curcanvas == nil)
@@ -254,6 +273,11 @@ lmb(Mousectl *mc, Keyboardctl *)
 void
 mouse(Mousectl *mc, Keyboardctl *kc)
 {
+	if(curcanvas == nil)
+		snprint(stats[SMPOS], sizeof stats[SMPOS], "%v", fromscreen(mc->xy));
+	else
+		snprint(stats[SMPOS], sizeof stats[SMPOS], "%v", rframexform(fromscreen(mc->xy), *curcanvas));
+
 	if((mc->buttons&1) != 0)
 		lmb(mc, kc);
 	if((mc->buttons&2) != 0)
@@ -296,6 +320,7 @@ threadmain(int argc, char *argv[])
 	Keyboardctl *kc;
 	Rune r;
 
+	GEOMfmtinstall();
 	ARGBEGIN{
 	default: usage();
 	}ARGEND;
