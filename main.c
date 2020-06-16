@@ -63,7 +63,7 @@ mkcheckerboard(int w, int h)
 }
 
 void
-drawlayer(Canvas *c, Layer *l)
+drawlayer(Layer *l, Canvas *c)
 {
 	draw(c->image, c->image->r, l->image, nil, ZP);
 }
@@ -76,7 +76,7 @@ drawcanvas(Canvas *c)
 	if(c == nil)
 		return;
 	for(l = c->layers.next; l != &c->layers; l = l->next)
-		drawlayer(c, l);
+		drawlayer(l, c);
 	draw(screen, rectaddpt(c->image->r, toscreen(c->p)), c->image, nil, ZP);
 }
 
@@ -142,6 +142,8 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	Point2 cpos;
 	Layer *l;
 
+	buf[0] = 0;
+
 	idx = menuhit(3, mc, &menu, nil);
 	if(idx < 0)
 		return;
@@ -149,9 +151,10 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	switch(idx){
 	case NEW:
 		if(curcanvas != nil)
-			break;
+			return;
 		snprint(buf, sizeof buf, "%d %d %s", Dx(screen->r), Dy(screen->r), chantostr(chanstr, screen->chan));
-		enter("w h chan", buf, sizeof buf, mc, kc, nil);
+		if(enter("w h chan", buf, sizeof buf, mc, kc, nil) <= 0)
+			return;
 		w = strtol(buf, &s, 10);
 		h = strtol(s, &s, 10);
 		chan = strtochan(s);
@@ -160,27 +163,26 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		break;
 	case NEWLAYER:
 		if(curcanvas == nil)
-			break;
-		buf[0] = 0;
-		while(strlen(buf) == 0 || getlayer(curcanvas, buf) != nil)
-			enter("layer name", buf, sizeof buf, mc, kc, nil);
+			return;
+		do{
+			if(enter("layer name", buf, sizeof buf, mc, kc, nil) <= 0)
+				return;
+		}while(getlayer(curcanvas, buf) != nil);
 		addlayer(curcanvas, buf);
 		break;
 	case SETCOLOR:
-		buf[0] = 0;
-		while(strlen(buf) == 0)
-			enter("hex value", buf, sizeof buf, mc, kc, nil);
+		if(enter("hex value", buf, sizeof buf, mc, kc, nil) <= 0)
+			return;
 		brushcolor = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, strtoul(buf, nil, 16));
 		break;
 	case SAVE:
 		if(curcanvas == nil)
-			break;
-		buf[0] = 0;
-		while(strlen(buf) == 0)
-			enter("file", buf, sizeof buf, mc, kc, nil);
+			return;
+		if(enter("file", buf, sizeof buf, mc, kc, nil) <= 0)
+			return;
 		fd = create(buf, OWRITE, 0666);
 		if(fd < 0)
-			break;
+			return;
 		drawcanvas(curcanvas);
 		writeimage(fd, curcanvas->image, 1);
 		close(fd);
