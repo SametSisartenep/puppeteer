@@ -205,12 +205,10 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	}
 
 	idx -= NITEMS;
-	if(idx >= 0){
-		l = curcanvas->layers.next;
-		while(l != &curcanvas->layers && idx--)
-			l = l->next;
-		curcanvas->curlayer = l;
-	}
+	l = curcanvas->layers.next;
+	while(l != &curcanvas->layers && idx--)
+		l = l->next;
+	curcanvas->curlayer = l;
 }
 
 void
