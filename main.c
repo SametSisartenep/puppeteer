@@ -103,6 +103,25 @@ redraw(void)
 	unlockdisplay(display);
 }
 
+static void
+pickerproc(void *arg)
+{
+	int *pfd;
+	char mntdesc[64];
+
+	pfd = arg;
+	close(pfd[1]);
+	dup(pfd[0], 0);
+	dup(pfd[0], 1);
+	close(pfd[0]);
+
+	snprint(mntdesc, sizeof mntdesc, "-pid %d -dx %d -dy %d", getpid(), 384, 320);
+	newwindow(mntdesc);
+
+	procexecl(nil, "/bin/picker", "picker", "-e", nil);
+	threadexits("procexecl: %r");
+}
+
 static char*
 genrmbmenuitem(int idx)
 {
@@ -149,7 +168,7 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	};
 	static Menu menu = { .gen = genrmbmenuitem };
 	char buf[256], chanstr[9+1], *s;
-	int w, h, idx, fd;
+	int w, h, idx, fd, n, pfd[2];
 	ulong chan;
 	Point2 cpos;
 	Layer *l;
@@ -184,9 +203,20 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		addlayer(curcanvas, buf);
 		break;
 	case SETCOLOR:
-		if(enter("hex value", buf, sizeof buf, mc, kc, nil) <= 0)
+		if(pipe(pfd) < 0)
+			sysfatal("pipe: %r");
+		procrfork(pickerproc, pfd, 4096, RFFDG|RFNAMEG);
+		close(pfd[0]);
+		fprint(pfd[1], "0 %08ux\n", 0x000000ff);
+		n = read(pfd[1], buf, sizeof(buf)-1);
+		close(pfd[1]);
+		if(n < 0)
 			return;
-		brushcolor = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, strtoul(buf, nil, 16));
+		buf[n] = 0;
+		s = buf;
+		while(*s && *s++ != '\t')
+			;
+		brushcolor = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, strtoul(s, nil, 16));
 		break;
 	case SAVE:
 		if(curcanvas == nil)
@@ -205,10 +235,12 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	}
 
 	idx -= NITEMS;
-	l = curcanvas->layers.next;
-	while(l != &curcanvas->layers && idx--)
-		l = l->next;
-	curcanvas->curlayer = l;
+	if(idx >= 0){
+		l = curcanvas->layers.next;
+		while(l != &curcanvas->layers && idx--)
+			l = l->next;
+		curcanvas->curlayer = l;
+	}
 }
 
 void
