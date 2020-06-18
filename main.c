@@ -63,6 +63,123 @@ mkcheckerboard(int w, int h)
 	return i;
 }
 
+/*
+ * A draw operation that touches only the area contained in bot but not in top.
+ * mp and sp get aligned with bot.min.
+ */
+static void
+gendrawdiff(Image *dst, Rectangle bot, Rectangle top, 
+	Image *src, Point sp, Image *mask, Point mp, int op)
+{
+	Rectangle r;
+	Point origin;
+	Point delta;
+
+	if(Dx(bot)*Dy(bot) == 0)
+		return;
+
+	/* no points in bot - top */
+	if(rectinrect(bot, top))
+		return;
+
+	/* bot - top ≡ bot */
+	if(Dx(top)*Dy(top)==0 || rectXrect(bot, top)==0){
+		gendrawop(dst, bot, src, sp, mask, mp, op);
+		return;
+	}
+
+	origin = bot.min;
+	/* split bot into rectangles that don't intersect top */
+	/* left side */
+	if(bot.min.x < top.min.x){
+		r = Rect(bot.min.x, bot.min.y, top.min.x, bot.max.y);
+		delta = subpt(r.min, origin);
+		gendrawop(dst, r, src, addpt(sp, delta), mask, addpt(mp, delta), op);
+		bot.min.x = top.min.x;
+	}
+
+	/* right side */
+	if(bot.max.x > top.max.x){
+		r = Rect(top.max.x, bot.min.y, bot.max.x, bot.max.y);
+		delta = subpt(r.min, origin);
+		gendrawop(dst, r, src, addpt(sp, delta), mask, addpt(mp, delta), op);
+		bot.max.x = top.max.x;
+	}
+
+	/* top */
+	if(bot.min.y < top.min.y){
+		r = Rect(bot.min.x, bot.min.y, bot.max.x, top.min.y);
+		delta = subpt(r.min, origin);
+		gendrawop(dst, r, src, addpt(sp, delta), mask, addpt(mp, delta), op);
+		bot.min.y = top.min.y;
+	}
+
+	/* bottom */
+	if(bot.max.y > top.max.y){
+		r = Rect(bot.min.x, top.max.y, bot.max.x, bot.max.y);
+		delta = subpt(r.min, origin);
+		gendrawop(dst, r, src, addpt(sp, delta), mask, addpt(mp, delta), op);
+		bot.max.y = top.max.y;
+	}
+}
+
+void
+zoomdraw(Image *d, Rectangle r, Rectangle top, Image *b, Image *s, Point sp, int f)
+{
+	Rectangle dr;
+	Image *t;
+	Point a;
+	int w;
+
+	a = ZP;
+	if(r.min.x < d->r.min.x){
+		sp.x += (d->r.min.x - r.min.x)/f;
+		a.x = (d->r.min.x - r.min.x)%f;
+		r.min.x = d->r.min.x;
+	}
+	if(r.min.y < d->r.min.y){
+		sp.y += (d->r.min.y - r.min.y)/f;
+		a.y = (d->r.min.y - r.min.y)%f;
+		r.min.y = d->r.min.y;
+	}
+	rectclip(&r, d->r);
+	w = s->r.max.x - sp.x;
+	if(w > Dx(r))
+		w = Dx(r);
+	dr = r;
+	dr.max.x = dr.min.x+w;
+	if(!alphachan(s->chan))
+		b = nil;
+	if(f <= 1){
+		if(b) gendrawdiff(d, dr, top, b, sp, nil, ZP, SoverD);
+		gendrawdiff(d, dr, top, s, sp, nil, ZP, SoverD);
+		return;
+	}
+	if((t = allocimage(display, dr, s->chan, 0, 0)) == nil)
+		return;
+	for(; dr.min.y < r.max.y; dr.min.y++){
+		dr.max.y = dr.min.y+1;
+		draw(t, dr, s, nil, sp);
+		if(++a.y == f){
+			a.y = 0;
+			sp.y++;
+		}
+	}
+	dr = r;
+	for(sp=dr.min; dr.min.x < r.max.x; sp.x++){
+		dr.max.x = dr.min.x+1;
+		if(b) gendrawdiff(d, dr, top, b, sp, nil, ZP, SoverD);
+		gendrawdiff(d, dr, top, t, sp, nil, ZP, SoverD);
+		for(dr.min.x++; ++a.x < f && dr.min.x < r.max.x; dr.min.x++){
+			dr.max.x = dr.min.x+1;
+			gendrawdiff(d, dr, top, d, Pt(dr.min.x-1, dr.min.y), nil, ZP, SoverD);
+		}
+		a.x = 0;
+	}
+	freeimage(t);
+}
+
+
 void
 drawstats(void)
 {
@@ -70,7 +187,7 @@ drawstats(void)
 	Point o;
 
 	for(i = 0, o = Pt(10,10); i < nelem(stats); i++, o.y += font->height)
-		stringn(screen, addpt(screen->r.min, o), pal[PCWhite], ZP, font, stats[i], sizeof stats[i]);
+		stringnbg(screen, addpt(screen->r.min, o), pal[PCWhite], ZP, font, stats[i], sizeof stats[i], pal[PCBlack], ZP);
 }
 
 void
@@ -88,15 +205,15 @@ drawcanvas(Canvas *c)
 		return;
 	for(l = c->layers.next; l != &c->layers; l = l->next)
 		drawlayer(l, c);
-	draw(screen, rectaddpt(c->image->r, toscreen(c->p)), c->image, nil, ZP);
+	zoomdraw(screen, rectaddpt(Rpt(mulpt(c->image->r.min, zoom),mulpt(c->image->r.max, zoom)), toscreen(c->p)), ZR, nil, c->image, ZP, zoom);
 }
 
 void
 redraw(void)
 {
 	lockdisplay(display);
-	draw(screen, screen->r, pal[PCBlack], nil, ZP);
-	draw(screen, curcanvas == nil? screen->r: rectaddpt(curcanvas->image->r, toscreen(curcanvas->p)), background, nil, ZP);
+	gendrawdiff(screen, screen->r, curcanvas == nil? ZR: rectaddpt(Rpt(mulpt(curcanvas->image->r.min, zoom),mulpt(curcanvas->image->r.max, zoom)), toscreen(curcanvas->p)),  pal[PCBlack], ZP, nil, ZP, S);
+	gendrawdiff(screen, curcanvas == nil? screen->r: rectaddpt(Rpt(mulpt(curcanvas->image->r.min, zoom),mulpt(curcanvas->image->r.max, zoom)), toscreen(curcanvas->p)), ZR, background, ZP, nil, ZP, S);
 	drawcanvas(curcanvas);
 	drawstats();
 	flushimage(display, 1);
@@ -196,6 +313,7 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	case NEWLAYER:
 		if(curcanvas == nil)
 			return;
+		snprint(buf, sizeof buf, "%s", curcanvas->layers.prev->name);
 		do{
 			if(enter("layer name", buf, sizeof buf, mc, kc, nil) <= 0)
 				return;
@@ -226,7 +344,9 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		fd = create(buf, OWRITE, 0666);
 		if(fd < 0)
 			return;
+		lockdisplay(display);
 		drawcanvas(curcanvas);
+		unlockdisplay(display);
 		writeimage(fd, curcanvas->image, 1);
 		close(fd);
 		break;	
@@ -314,10 +434,16 @@ mouse(Mousectl *mc, Keyboardctl *kc)
 		mmb(mc, kc);
 	if((mc->buttons&4) != 0)
 		rmb(mc, kc);
-	if((mc->buttons&8) != 0)
-		zoom = clamp(++zoom, 0, MAXZOOM);
-	if((mc->buttons&16) != 0)
-		zoom = clamp(--zoom, 0, MAXZOOM);
+	if((mc->buttons&8) != 0){
+		zoom = clamp(++zoom, 1, MAXZOOM);
+		worldrf.bx = Vec2(zoom,0);
+		worldrf.by = Vec2(0,zoom);
+	}
+	if((mc->buttons&16) != 0){
+		zoom = clamp(--zoom, 1, MAXZOOM);
+		worldrf.bx = Vec2(zoom,0);
+		worldrf.by = Vec2(0,zoom);
+	}
 }
 
 void
@@ -328,10 +454,14 @@ key(Rune r)
 	case 'q':
 		threadexitsall(nil);
 	case '+':
-		zoom = clamp(++zoom, 0, MAXZOOM);
+		zoom = clamp(++zoom, 1, MAXZOOM);
+		worldrf.bx = Vec2(zoom,0);
+		worldrf.by = Vec2(0,zoom);
 		break;
 	case '-':
-		zoom = clamp(--zoom, 0, MAXZOOM);
+		zoom = clamp(--zoom, 1, MAXZOOM);
+		worldrf.bx = Vec2(zoom,0);
+		worldrf.by = Vec2(0,zoom);
 		break;
 	}
 }

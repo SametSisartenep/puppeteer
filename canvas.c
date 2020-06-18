@@ -40,7 +40,7 @@ addlayer(Canvas *c, char *name)
 {
 	Layer *l;
 
-	l = newlayer(name, c->image->r, c->image->chan);
+	l = newlayer(name, c->image->r, RGBA32);
 	l->prev = c->layers.prev;
 	l->next = &c->layers;
 	c->layers.prev->next = l;

@@ -19,6 +19,7 @@ struct Layer
 	RFrame;
 	char *name;
 	Image *image;
+	Image *history[1024];
 	Layer *prev, *next;
 };
 
