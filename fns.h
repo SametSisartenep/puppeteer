@@ -13,7 +13,10 @@ Layer *getlayer(Canvas*, char*);
 Layer *newlayer(char*, Rectangle, ulong);
 void rmlayer(Layer*);
 
+/* color */
+Color *newcolor(ulong);
+void rmcolor(Color*);
+
 /* utils */
 int clamp(int, int, int);
-double fclamp(double, double, double);
 int alphachan(ulong);

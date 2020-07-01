@@ -8,12 +8,6 @@ clamp(int n, int min, int max)
 	return n < min? min: n > max? max: n;
 }
 
-double
-fclamp(double n, double min, double max)
-{
-	return n < min? min: n > max? max: n;
-}
-
 int
 alphachan(ulong chan)
 {

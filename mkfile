@@ -6,6 +6,7 @@ OFILES=\
 	utils.$O\
 	hud.$O\
 	alloc.$O\
+	color.$O\
 	layer.$O\
 	canvas.$O\
 	main.$O\

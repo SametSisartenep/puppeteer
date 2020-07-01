@@ -9,10 +9,17 @@ enum {
 	MAXZOOM = 8
 };
 
+typedef struct Color Color;
 typedef struct Layer Layer;
 typedef struct Canvas Canvas;
 typedef struct HUD HUD;
 typedef struct HUDWidget HUDWidget;
+
+struct Color
+{
+	ulong v;
+	Image *i;
+};
 
 struct Layer
 {

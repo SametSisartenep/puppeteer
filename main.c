@@ -16,7 +16,7 @@ enum {
 RFrame worldrf;
 Image *background;
 Canvas *curcanvas;
-Image *brushcolor;
+Color *brushcolor;
 Image *pal[NCOLOR];
 int zoom = 1;
 
@@ -235,7 +235,7 @@ pickerproc(void *arg)
 	snprint(mntdesc, sizeof mntdesc, "-pid %d -dx %d -dy %d", getpid(), 384, 320);
 	newwindow(mntdesc);
 
-	procexecl(nil, "/bin/picker", "picker", "-e", nil);
+	execl("/bin/picker", "picker", "-e", nil);
 	threadexits("procexecl: %r");
 }
 
@@ -323,9 +323,9 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 	case SETCOLOR:
 		if(pipe(pfd) < 0)
 			sysfatal("pipe: %r");
-		procrfork(pickerproc, pfd, 4096, RFFDG|RFNAMEG);
+		procrfork(pickerproc, pfd, 4096, RFFDG|RFNAMEG|RFNOTEG);
 		close(pfd[0]);
-		fprint(pfd[1], "0 %08ux\n", 0x000000ff);
+		fprint(pfd[1], "0 %08ulx\n", brushcolor->v);
 		n = read(pfd[1], buf, sizeof(buf)-1);
 		close(pfd[1]);
 		if(n < 0)
@@ -334,7 +334,8 @@ rmb(Mousectl *mc, Keyboardctl *kc)
 		s = buf;
 		while(*s && *s++ != '\t')
 			;
-		brushcolor = eallocimage(display, Rect(0,0,1,1), screen->chan, 1, strtoul(s, nil, 16));
+		rmcolor(brushcolor);
+		brushcolor = newcolor(strtoul(s, nil, 16));
 		break;
 	case SAVE:
 		if(curcanvas == nil)
@@ -401,7 +402,7 @@ lmb(Mousectl *mc, Keyboardctl *)
 	mpos = rframexform(mpos, *curcanvas);
 	p = Pt(mpos.x,mpos.y);
 
-	draw(curcanvas->curlayer->image, rectaddpt(r, p), brushcolor, nil, ZP);
+	draw(curcanvas->curlayer->image, rectaddpt(r, p), brushcolor->i, nil, ZP);
 	redraw();
 	for(;;){
 		oldp = p;
@@ -415,7 +416,7 @@ lmb(Mousectl *mc, Keyboardctl *)
 		p = Pt(mpos.x,mpos.y);
 		if(eqpt(p, oldp))
 			continue;
-		line(curcanvas->curlayer->image, oldp, p, Endsquare, Endsquare, 0, brushcolor, ZP);
+		line(curcanvas->curlayer->image, oldp, p, Endsquare, Endsquare, 0, brushcolor->i, ZP);
 		redraw();
 	}
 }
@@ -499,7 +500,7 @@ threadmain(int argc, char *argv[])
 	worldrf.by = Vec2(0,1);
 	initpalette();
 	background = mkcheckerboard(4, 4);
-	brushcolor = pal[PCBlack];
+	brushcolor = newcolor(DBlack);
 
 	display->locking = 1;
 	unlockdisplay(display);
